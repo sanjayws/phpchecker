@@ -7,7 +7,7 @@
 
 Affected: PHP 5.4.0 – 8.5.11. Fixed in **8.2.35, 8.3.36, 8.4.27 and 8.5.12**. PHP 8.1 and older are end-of-life and get no upstream fix.
 
-Live: https://phpchecker.sanjay6326.workers.dev · One Cloudflare Worker, no database, no build step, no runtime dependencies.
+Live: https://2026phpcheck.astios.net/ · One Cloudflare Worker, no database, no build step, no runtime dependencies.
 
 ## Privacy: what is tracked
 
