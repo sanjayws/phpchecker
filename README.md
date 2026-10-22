@@ -1,5 +1,7 @@
 # PHPChecker
 
+*PHPChecker by [Ordinexis](https://ordinexis.com)*
+
 **Open-source (MIT) scanner that checks websites for the "php2shell" PHP vulnerabilities:**
 
 * **CVE-2026-109618** – an out-of-memory handling vulnerability that could allow an unauthenticated remote attacker to execute arbitrary code on affected systems.

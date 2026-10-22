@@ -27,7 +27,7 @@ const PAGE = String.raw`<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
-<title>PHPChecker – php2shell CVE scanner</title>
+<title>PHPChecker by Ordinexis – php2shell CVE scanner</title>
 <meta name="description" content="Scanner for the php2shell PHP vulnerabilities CVE-2026-109618 and CVE-2026-109619, with fixes, workarounds and detection help.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%234f46e5' d='M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5z'/%3E%3Cpath d='m8.5 12 2.5 2.5 4.5-5' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style nonce="__NONCE__">
@@ -45,6 +45,9 @@ header.top{position:sticky;top:0;z-index:10;background:rgba(255,255,255,.88);bac
 header.top .wrap{display:flex;align-items:center;justify-content:space-between;height:60px}
 .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;letter-spacing:-.02em;color:var(--ink)}
 .brand:hover{text-decoration:none}
+.brandwrap{display:flex;align-items:baseline;gap:8px}
+.by{margin:0;font-size:12px;color:var(--muted);white-space:nowrap}
+.by:hover{color:var(--accent)}
 .ghbtn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:7px 13px;font-size:14px;font-weight:600;color:var(--ink);background:#fff}
 .ghbtn:hover{background:var(--soft);text-decoration:none}
 
@@ -205,7 +208,7 @@ footer b{color:var(--ink2);font-weight:600}
 </head>
 <body data-mode="home">
 <header class="top"><div class="wrap">
-  <a class="brand" href="/" aria-label="PHPChecker home"><svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4f46e5" d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5z"/><path d="m8.5 12 2.5 2.5 4.5-5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>PHPChecker</a>
+  <div class="brandwrap"><a class="brand" href="/" aria-label="PHPChecker home"><svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4f46e5" d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5z"/><path d="m8.5 12 2.5 2.5 4.5-5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>PHPChecker</a><a class="by" href="https://ordinexis.com" target="_blank" rel="noopener noreferrer">by Ordinexis</a></div>
   <a class="ghbtn" href="__REPO__" target="_blank" rel="noopener noreferrer"><span class="ic">__I_GITHUB__</span><span class="t">GitHub</span></a>
 </div></header>
 <section class="hero" id="hero">
@@ -226,7 +229,7 @@ footer b{color:var(--ink2);font-weight:600}
   __HOME__
 </main>
 <footer><div class="wrap">
-  <span><b>Open source</b> (MIT) &middot; <a href="__REPO__" target="_blank" rel="noopener noreferrer">source on GitHub</a> &middot; fallback method from <a href="https://github.com/openai/php2shell-checker" target="_blank" rel="noopener noreferrer">OpenAI php2shell-checker</a> (Apache-2.0)</span>
+  <span><b>PHPChecker</b> by <a href="https://ordinexis.com" target="_blank" rel="noopener noreferrer">Ordinexis</a> &middot; <b>Open source</b> (MIT) &middot; <a href="__REPO__" target="_blank" rel="noopener noreferrer">source on GitHub</a> &middot; fallback method from <a href="https://github.com/openai/php2shell-checker" target="_blank" rel="noopener noreferrer">OpenAI php2shell-checker</a> (Apache-2.0)</span>
   <span>No cookies, analytics or tracking. Only scan requests are logged, for safety and audit-trail purposes.</span>
 </div></footer>
 <script nonce="__NONCE__">
