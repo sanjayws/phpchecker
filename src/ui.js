@@ -116,7 +116,7 @@ footer{border-top:1px solid var(--line);background:var(--code);color:var(--muted
 <main id="main">
   <div id="out" aria-live="polite"></div>
 </main>
-<footer><span><b>Open source</b> (MIT) &middot; <a href="__REPO__" target="_blank" rel="noopener noreferrer">source on GitHub</a> &middot; No cookies, analytics or tracking. Only scan requests are logged, for safety and audit-trail purposes.</span><span>Advisory data: <a href="https://github.com/ikow/php2shell-poc" target="_blank" rel="noopener noreferrer">ikow/php2shell-poc</a> and linked advisories &middot; verify against php.net</span></footer>
+<footer><span><b>Open source</b> (MIT) &middot; <a href="__REPO__" target="_blank" rel="noopener noreferrer">source on GitHub</a> &middot; No cookies, analytics or tracking. Only scan requests are logged, for safety and audit-trail purposes.</span></footer>
 <script nonce="__NONCE__">
 (function(){
 var $=function(s){return document.querySelector(s)};
@@ -276,7 +276,7 @@ const fixedList = Object.entries(ADVISORY.fixed).map(([b, p]) => `${b}.${p}`).jo
 const CVES_HTML =
   '<section class="cves" aria-labelledby="cves-h"><h2 id="cves-h">This app scans websites for</h2><ul>' +
   ADVISORY.cves
-    .map((c) => `<li><a href="https://www.cve.org/CVERecord?id=${esc(c.id)}" target="_blank" rel="noopener noreferrer"><b>${esc(c.id)}</b></a>: ${esc(c.description)}</li>`)
+    .map((c) => `<li><b>${esc(c.id)}</b>: ${esc(c.description)}</li>`)
     .join('') +
   `</ul><p>How: ${esc(PROJECT.name)} reads the PHP version a site discloses and compares it with the affected range ` +
   `(PHP 5.4.0 &ndash; ${esc(ADVISORY.lastAffected)}; fixed in ${esc(fixedList)}). Sites that hide their version are reported as &ldquo;unknown&rdquo;, not safe.</p></section>`;
