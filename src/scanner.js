@@ -222,7 +222,7 @@ export function analyze(input, hops, body = '', meta = {}) {
     }[verdict];
     detail = assessment.summary;
     if (backport && verdict === 'verify') {
-      detail += ` This is a ${backport} build; vendors often backport fixes without changing the version number, so check the package changelog for ${ADVISORY.cves.map((c) => c.id).join(' and ')}.`;
+      detail += ` This build comes from ${backport}, and vendors often backport fixes without changing the version number, so check the package changelog for ${ADVISORY.cves.map((c) => c.id).join(' and ')}.`;
     }
     if (verdict === 'patched') detail += ' Banners can be spoofed or stale; confirm workers were restarted after the upgrade.';
   } else if (phpDetected) {
@@ -409,7 +409,7 @@ export function checkVersion(input) {
     scannedAt: new Date().toISOString(),
     verdict,
     headline: { vulnerable: 'Vulnerable version', verify: 'Needs verification', patched: 'Patched version' }[verdict],
-    detail: assessment.summary + (backport ? ` This looks like a ${backport} build; check its changelog for the backported fix.` : ''),
+    detail: assessment.summary + (backport ? ` This build comes from ${backport}; check its changelog for the backported fix.` : ''),
     php: { detected: true, version: assessment.version, fixedIn: assessment.fixedIn, status: assessment.status, sapi: 'unknown', distro: backport, cms: [], evidence: [] },
     findings: [],
     context,
