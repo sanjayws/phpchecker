@@ -1,0 +1,17 @@
+name = "phpchecker"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+preview_urls = false
+
+# Scan audit log: the Worker prints one JSON line per scan; Workers Logs keeps them.
+# View in the dashboard (Workers > phpchecker > Logs) or with `npx wrangler tail`.
+[observability]
+enabled = true
+
+# Optional: Workers Rate Limiting binding. The Worker also has an in-isolate fallback,
+# so it still works if you delete this block.
+[[ratelimits]]
+name = "SCAN_LIMITER"
+namespace_id = "1001"
+simple = { limit = 10, period = 60 }

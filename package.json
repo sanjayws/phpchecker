@@ -1,0 +1,22 @@
+{
+  "name": "phpchecker",
+  "version": "1.0.0",
+  "description": "Open-source scanner for the php2shell PHP CVEs (CVE-2026-109618, CVE-2026-109619), as a single Cloudflare Worker",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node --test \"test/*.test.js\"",
+    "validate": "node validation/validate.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sanjayws/phpchecker.git"
+  },
+  "homepage": "https://phpchecker.sanjay6326.workers.dev"
+}
