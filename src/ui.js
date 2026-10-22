@@ -10,46 +10,46 @@ const PAGE = String.raw`<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
 <title>PHPChecker – php2shell CVE scanner</title>
 <meta name="description" content="Open-source scanner that checks websites for the php2shell PHP vulnerabilities CVE-2026-109618 and CVE-2026-109619, with fixes, workarounds and detection help.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='14' cy='14' r='9' fill='none' stroke='%231a73e8' stroke-width='4'/%3E%3Cpath d='M21 21l8 8' stroke='%231a73e8' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%234338ca' d='M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5z'/%3E%3Cpath d='m8.5 12 2.5 2.5 4.5-5' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style nonce="__NONCE__">
-:root{--bg:#fff;--fg:#202124;--muted:#5f6368;--line:#dfe1e5;--link:#1a0dab;--crumb:#188038;--blue:#4285f4;--red:#ea4335;--yellow:#fbbc05;--green:#34a853;--card:#fff;--code:#f1f3f4;--shadow:0 1px 6px rgba(32,33,36,.28);--ok:#188038;--bad:#d93025;--warn:#b06000;--idle:#5f6368}
-@media (prefers-color-scheme:dark){:root{--bg:#202124;--fg:#e8eaed;--muted:#9aa0a6;--line:#3c4043;--link:#8ab4f8;--crumb:#81c995;--card:#292a2d;--code:#171717;--shadow:0 1px 6px rgba(0,0,0,.6);--ok:#81c995;--bad:#f28b82;--warn:#fdd663;--idle:#9aa0a6}}
+:root{color-scheme:light;--bg:#f8f9fc;--fg:#161a2b;--muted:#5b6378;--line:#d9dde8;--link:#4338ca;--accent:#4338ca;--accent-fg:#fff;--card:#fff;--code:#eef0f6;--shadow:0 2px 12px rgba(67,56,202,.18);--ok:#16794c;--bad:#c62828;--warn:#b26a00;--idle:#5b6378}
 *{box-sizing:border-box}
 html,body{margin:0}
-body{background:var(--bg);color:var(--fg);font:14px/1.58 Arial,"Helvetica Neue",Helvetica,sans-serif;min-height:100vh;display:flex;flex-direction:column}
+body{background:var(--bg);color:var(--fg);font:14px/1.58 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;min-height:100vh;display:flex;flex-direction:column}
 a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
 button{font:inherit}
-.hero{display:flex;flex-direction:column;align-items:center;margin-top:20vh;padding:0 16px}
-.logo{font-size:68px;font-weight:500;letter-spacing:-2px;line-height:1;user-select:none;margin:0 0 26px;font-family:"Product Sans","Google Sans",Arial,sans-serif}
-.logo a{color:inherit;text-decoration:none}
-.logo span:nth-child(6n+1),.logo span:nth-child(6n+4){color:var(--blue)}
-.logo span:nth-child(6n+2),.logo span:nth-child(6n){color:var(--red)}
-.logo span:nth-child(6n+3){color:var(--yellow)}
-.logo span:nth-child(6n+5){color:var(--green)}
-form{width:100%;max-width:584px}
-.box{display:flex;align-items:center;gap:12px;height:46px;padding:0 18px;border:1px solid var(--line);border-radius:24px;background:var(--card)}
-.box:hover,.box:focus-within{box-shadow:var(--shadow);border-color:transparent}
+.hero{display:flex;flex-direction:column;align-items:center;margin-top:11vh;padding:0 16px}
+header.top{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--line);background:var(--card)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;color:var(--fg);letter-spacing:-.2px}
+.brand:hover{text-decoration:none}.brand svg{fill:var(--accent)}
+.toplinks{display:flex;gap:18px;font-size:13px}
+.title{font-size:30px;line-height:1.25;font-weight:700;letter-spacing:-.5px;text-align:center;margin:0 0 8px;white-space:nowrap}
+.sub{margin:0 0 26px;color:var(--muted);text-align:center;font-size:15px;white-space:nowrap}
+form{width:100%;max-width:640px}
+.row{display:flex;gap:10px}
+.box{flex:1;display:flex;align-items:center;gap:10px;height:50px;padding:0 14px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+.box:focus-within{box-shadow:var(--shadow);border-color:var(--accent)}
 .box svg{flex:none;fill:var(--muted)}
-.box input{flex:1;min-width:0;height:100%;border:0;outline:0;background:transparent;color:var(--fg);font:16px Arial,sans-serif}
+.box input{flex:1;min-width:0;height:100%;border:0;outline:0;background:transparent;color:var(--fg);font:16px system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
 .note{margin:16px 8px 0;text-align:center;color:var(--muted);font-size:12px}
-.cves{width:100%;max-width:584px;margin:30px 0 0;font-size:13px;color:var(--muted)}
+.cves{width:100%;max-width:640px;margin:30px 0 0;font-size:13px;color:var(--muted)}
 .cves h2{font-size:13px;font-weight:700;color:var(--fg);margin:0 0 6px;text-transform:uppercase;letter-spacing:.5px}
 .cves ul{margin:0;padding-left:18px}.cves li{margin:4px 0}
 .cves p{margin:8px 0 0}
 footer b{color:var(--fg);font-weight:600}
-.actions{display:flex;gap:12px;justify-content:center;margin-top:24px}
-.btn{background:var(--code);color:var(--fg);border:1px solid var(--code);border-radius:4px;padding:0 16px;height:36px;cursor:pointer}
-.btn:hover{border-color:var(--line);box-shadow:0 1px 1px rgba(0,0,0,.1)}
+.btn{background:var(--accent);color:var(--accent-fg);border:0;border-radius:8px;padding:0 24px;height:50px;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn:hover{filter:brightness(1.1)}
 main{flex:1;width:100%;max-width:780px;margin:0 auto;padding:0 16px 40px}
 [hidden]{display:none!important}
-body[data-mode=results] .hero{margin-top:7vh}
+body[data-mode=results] .hero{margin-top:5vh}
 body[data-mode=results] .cves{display:none}
 body[data-mode=results] main{margin-top:28px}
 .stats{color:var(--muted);font-size:13px;margin:16px 0 8px}
 .card{background:var(--card);border:1px solid var(--line);border-left-width:6px;border-radius:8px;padding:16px 20px;margin:12px 0 8px}
-.card.vulnerable{border-left-color:var(--bad)}.card.verify{border-left-color:var(--yellow)}.card.patched{border-left-color:var(--ok)}.card.unknown,.card.no-php,.card.error{border-left-color:var(--idle)}
+.card.vulnerable{border-left-color:var(--bad)}.card.verify{border-left-color:var(--warn)}.card.patched{border-left-color:var(--ok)}.card.unknown,.card.no-php,.card.error{border-left-color:var(--idle)}
 .pill{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:2px 10px;border-radius:12px;border:1px solid currentColor}
 .vulnerable .pill{color:var(--bad)}.verify .pill{color:var(--warn)}.patched .pill{color:var(--ok)}.unknown .pill,.no-php .pill,.error .pill{color:var(--idle)}
 .card h2{font-size:22px;font-weight:400;margin:10px 0 6px}
@@ -71,10 +71,10 @@ dt{color:var(--muted)}dd{margin:0;word-break:break-word}
 .find b{display:block}.find span{color:var(--muted)}
 h3.sec{font-size:18px;font-weight:400;margin:26px 0 4px}
 .res{margin:18px 0}
-.crumb{color:var(--crumb);font-size:12px;line-height:1.3;word-break:break-all}
+.crumb{color:var(--muted);font-size:12px;line-height:1.3;word-break:break-all}
 .res a.t{font-size:19px;line-height:1.3;display:inline-block;margin:2px 0}
 .res p{margin:2px 0 0;color:var(--muted)}
-.rel{display:inline-block;margin-left:8px;font-size:11px;color:var(--ok);border:1px solid var(--ok);border-radius:10px;padding:0 7px;vertical-align:middle}
+.rel{display:inline-block;margin-left:8px;font-size:11px;color:var(--ok);border:1px solid var(--ok);border-radius:4px;padding:0 7px;vertical-align:middle}
 details.guide{border:1px solid var(--line);border-radius:8px;margin:14px 0;background:var(--card)}
 details.guide summary{cursor:pointer;padding:12px 16px;list-style:none}
 details.guide summary::-webkit-details-marker{display:none}
@@ -87,21 +87,28 @@ details.guide[open] summary{border-bottom:1px solid var(--line)}
 .codewrap{position:relative}
 pre{background:var(--code);border-radius:6px;padding:12px 14px;overflow-x:auto;font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;margin:8px 0}
 .copy{position:absolute;top:6px;right:6px;font-size:11px;padding:2px 8px;border:1px solid var(--line);border-radius:4px;background:var(--card);color:var(--muted);cursor:pointer}
-.spin{margin:48px auto;width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--blue);border-radius:50%;animation:s 1s linear infinite}
+.spin{margin:48px auto;width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:s 1s linear infinite}
 @keyframes s{to{transform:rotate(360deg)}}
 footer{border-top:1px solid var(--line);background:var(--code);color:var(--muted);padding:14px 24px;font-size:13px;display:flex;flex-wrap:wrap;gap:6px 24px;justify-content:space-between}
-@media (max-width:600px){.logo{font-size:48px}dl{grid-template-columns:1fr}}
+@media (max-width:700px){.title{font-size:min(30px,4.6vw)}.sub{white-space:normal;font-size:14px}.row{flex-direction:column}.box{flex:none}.btn{width:100%}dl{grid-template-columns:1fr}header.top{padding:12px 16px}}
 </style>
 </head>
 <body data-mode="home">
+<header class="top">
+  <a class="brand" href="/" aria-label="PHPChecker home"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5z"/><path d="m8.5 12 2.5 2.5 4.5-5" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>PHPChecker</a>
+  <nav class="toplinks"><a href="__REPO__" target="_blank" rel="noopener noreferrer">Source on GitHub</a></nav>
+</header>
 <div class="hero" id="hero">
-  <h1 class="logo"><a href="/" aria-label="PHPChecker home"><span>p</span><span>h</span><span>p</span><span>c</span><span>h</span><span>e</span><span>c</span><span>k</span><span>e</span><span>r</span></a></h1>
+  <h1 class="title">Is your PHP website exposed to php2shell?</h1>
+  <p class="sub">Free, open-source scanner for CVE-2026-109618 and CVE-2026-109619.</p>
   <form id="form" autocomplete="off">
-    <label class="box">
-      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-      <input id="q" name="q" type="text" inputmode="url" spellcheck="false" autocapitalize="off" placeholder="Enter a website URL to scan" aria-label="Website URL" autofocus>
-    </label>
-    <div class="actions"><button class="btn" type="submit">Scan</button></div>
+    <div class="row">
+      <label class="box">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color:var(--muted)"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>
+        <input id="q" name="q" type="text" inputmode="url" spellcheck="false" autocapitalize="off" placeholder="https://your-website.com" aria-label="Website URL" autofocus>
+      </label>
+      <button class="btn" type="submit">Scan website</button>
+    </div>
     <p class="note"><b>By scanning you confirm you own this site or are authorised to test it.</b><br><b>Passive check only &ndash; nothing is exploited.</b></p>
   </form>
   __CVES__
