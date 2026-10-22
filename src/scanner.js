@@ -1,9 +1,10 @@
 import { ADVISORY } from './advisory.js';
-import { assessVersion, detectBackport, extractPhpToken, parseVersion, verdictFor } from './version.js';
+import { assessVersion, detectBackport, extractPhpToken, parseVersion } from './version.js';
 import { fingerprintOS, parseServer } from './fingerprint.js';
 import { assertPublic, normalizeTarget, ScanError } from './validate.js';
 import { PROJECT } from './project.js';
 import { TRANSPORT_HEADER, resolvesToCloudflare } from './transport.js';
+import { runOpenaiCheck, openaiPatchStatus } from './openai-method.js';
 
 const MAX_HOPS = 3;
 const MAX_BODY_BYTES = 64 * 1024;
@@ -98,11 +99,22 @@ export async function scan(input, { fetchImpl = fetch, dnsFetch = fetch, timeout
     break;
   }
 
+  // Check 2 runs on every scan: OpenAI's php2shell-checker method (see openai-method.js).
+  const oaOpts = { fetchImpl, signal, userAgent: USER_AGENT, stripEdge: withoutEdgeStamps };
+  let openai = await runOpenaiCheck(normalizeTarget(input), oaOpts);
+  // Upstream doesn't follow redirects, so a site that redirects (e.g. apex -> www) would show nothing but the
+  // redirect. If that happened and no version was found, run the same method once on the final URL, and say so.
+  const finalUrl = hops[hops.length - 1].url;
+  if (!openai.version && hops.length > 1 && openai.requests.some((r) => r.status >= 300 && r.status < 400)) {
+    const second = await runOpenaiCheck(new URL(finalUrl), oaOpts);
+    openai = { ...second, requests: [...openai.requests, ...second.requests], followedRedirect: true };
+  }
+
   // Edge-stamped headers can't tell us whether the target itself is on Cloudflare; DNS can.
   const finalHop = hops[hops.length - 1];
   const cfDns = finalHop.transport === 'edge-fetch' ? await resolvesToCloudflare(new URL(finalHop.url).hostname, { fetchImpl: dnsFetch }) : null;
 
-  return analyze(input, hops, body, { elapsedMs: Date.now() - startedAt, bodyChars: body.length, notes, cfDns });
+  return analyze(input, hops, body, { elapsedMs: Date.now() - startedAt, bodyChars: body.length, notes, cfDns, openai });
 }
 
 async function readLimited(res, max) {
@@ -144,6 +156,29 @@ function withoutEdgeStamps(headers) {
   return h;
 }
 
+const outcomeOf = (st) => (st === 'vulnerable' || st === 'vulnerable_eol' ? 'positive' : st === 'patched' || st === 'ok' ? 'negative' : 'inconclusive');
+const OA_WORDS = {
+  vulnerable: 'at or below the vulnerable cutoff for its branch',
+  ok: 'above the vulnerable cutoff for its branch',
+  unknown: 'not rated (pre-release build or a branch outside the table)',
+};
+const CHECK1 = { id: 'plain', name: 'Check 1 · Plain version check' };
+const CHECK2 = { id: 'openai', name: "Check 2 · OpenAI's php2shell-checker method" };
+
+/** The fixed rule: positive if EITHER check is positive; negative only if BOTH are negative; else inconclusive. */
+export function combineChecks(check1, check2) {
+  const bothPositive = check1.outcome === 'positive' && check2.outcome === 'positive';
+  const anyPositive = check1.outcome === 'positive' || check2.outcome === 'positive';
+  const bothNegative = check1.outcome === 'negative' && check2.outcome === 'negative';
+  const final = anyPositive ? 'positive' : bothNegative ? 'negative' : 'inconclusive';
+  let rule = 'Neither check is positive, but they are not both negative → inconclusive.';
+  if (bothPositive) rule = 'Both checks are positive → positive.';
+  else if (check2.outcome === 'positive') rule = 'The OpenAI check is positive → positive. (A positive from either check is enough.)';
+  else if (check1.outcome === 'positive') rule = 'The plain version check is positive → positive. (A positive from either check is enough.)';
+  else if (bothNegative) rule = 'Both checks are negative → negative.';
+  return { final, rule };
+}
+
 /** Pure function over collected hops so it can be unit-tested without network. */
 export function analyze(input, hops, body = '', meta = {}) {
   const final = hops[hops.length - 1];
@@ -183,6 +218,14 @@ export function analyze(input, hops, body = '', meta = {}) {
       if (phpToken) versionBanner = server;
     }
   }
+  // Check 1 reflects only what the page response itself disclosed; Check 2 is the OpenAI method.
+  const ownToken = phpToken;
+  const oa = meta.openai;
+  if (!phpToken && oa?.version) {
+    phpToken = oa.version.slice(0, 80);
+    versionBanner = oa.source.replace(/^[^:]+:\s*/, '');
+    evidence.push(`${oa.source} (${oa.requests.map((r) => r.method).join(' → ')} request, OpenAI checker method)`);
+  }
   const sessionCookie = cookies.find((c) => c.toUpperCase() === 'PHPSESSID');
   if (sessionCookie) evidence.push('Set-Cookie: PHPSESSID (PHP session cookie)');
   if (/\.php(\?|$)/i.test(final.url)) evidence.push(`URL ends in .php (${new URL(final.url).pathname})`);
@@ -210,21 +253,50 @@ export function analyze(input, hops, body = '', meta = {}) {
     else if (/microsoft-iis/i.test(server)) sapi = 'likely FastCGI (IIS)';
   }
 
+  // ---- Two transparent checks, combined by a fixed rule ----
+  const ownV = ownToken ? parseVersion(ownToken) : null;
+  const ownAssessment = ownV ? assessVersion(ownV) : null;
+  const check1 = {
+    ...CHECK1,
+    how: "PHP version in the page response headers, compared with the advisory's fixed releases",
+    outcome: ownAssessment ? outcomeOf(ownAssessment.status) : 'inconclusive',
+    version: ownAssessment?.version ?? null,
+    detail: ownAssessment ? ownAssessment.summary : 'The page response does not disclose a PHP version.',
+  };
+  const check2 = {
+    ...CHECK2,
+    how: "HEAD request to the URL as entered, versions in Server / X-Powered-By, OpenAI's version table",
+    outcome: oa ? outcomeOf(oa.status) : 'inconclusive',
+    version: oa?.version ?? null,
+    detail: !oa
+      ? 'This check did not run.'
+      : oa.version
+        ? `PHP ${oa.version} is ${OA_WORDS[oa.status]}.`
+        : `No PHP version in the Server or X-Powered-By headers of the ${oa.requests.map((r) => r.method).join('/') || 'HEAD'} request${oa.error ? ` (${oa.error})` : ''}.`,
+  };
+  const { final: finalOutcome, rule } = combineChecks(check1, check2);
+  const cveNames = ADVISORY.cves.map((c) => c.id).join(' and ');
+
   let verdict;
   let headline;
   let detail;
-  if (assessment) {
-    verdict = verdictFor(assessment, backport);
-    headline = {
-      vulnerable: 'Likely vulnerable',
-      verify: 'Needs verification',
-      patched: 'Patched version reported',
-    }[verdict];
-    detail = assessment.summary;
-    if (backport && verdict === 'verify') {
-      detail += ` This build comes from ${backport}, and vendors often backport fixes without changing the version number, so check the package changelog for ${ADVISORY.cves.map((c) => c.id).join(' and ')}.`;
-    }
-    if (verdict === 'patched') detail += ' Banners can be spoofed or stale; confirm workers were restarted after the upgrade.';
+  if (finalOutcome === 'positive') {
+    verdict = 'vulnerable';
+    headline = 'Likely vulnerable';
+    detail = check1.outcome === 'positive' ? check1.detail : `The OpenAI check reports PHP ${check2.version} as affected. ${check2.detail}`;
+    if (backport) detail += ` This build comes from ${backport}; vendors often backport fixes without changing the version number, so also check the package changelog for ${cveNames}.`;
+  } else if (finalOutcome === 'negative') {
+    verdict = 'patched';
+    headline = 'Patched version reported';
+    detail = `${check1.detail} Banners can be spoofed or stale; confirm workers were restarted after the upgrade.`;
+  } else if (check1.outcome === 'negative' || check2.outcome === 'negative') {
+    verdict = 'verify';
+    headline = 'Needs verification';
+    detail = `One check found a fixed version but the other could not confirm it (${check1.outcome === 'negative' ? check2.detail : check1.detail}) Confirm the version on the server itself.`;
+  } else if (ownAssessment && ['prerelease', 'unlisted', 'incomplete'].includes(ownAssessment.status)) {
+    verdict = 'verify';
+    headline = 'Needs verification';
+    detail = ownAssessment.summary;
   } else if (phpDetected) {
     verdict = 'unknown';
     headline = 'PHP detected, version hidden';
@@ -306,6 +378,13 @@ export function analyze(input, hops, body = '', meta = {}) {
       status: phpToken ? 'found' : 'none',
       note: phpToken ? `Read PHP version "${phpToken}" from "${versionBanner}".` : 'The site does not disclose a PHP version in its headers.',
     },
+    { name: check1.name, status: check1.outcome === 'inconclusive' ? 'none' : 'found', note: `${check1.outcome.toUpperCase()}: ${check1.detail}` },
+    {
+      name: check2.name,
+      status: check2.outcome === 'inconclusive' ? 'none' : 'found',
+      note: `${check2.outcome.toUpperCase()}: ${check2.detail} (${oa?.requests?.length ? oa.requests.map((r) => `${r.method} ${new URL(r.url).host} → HTTP ${r.status}`).join(', then ') : 'no response'}${oa?.followedRedirect ? '; the first URL only redirected, so the same method was repeated on the final URL' : ''}; method and version table from OpenAI's php2shell-checker, Apache-2.0)`,
+    },
+    { name: 'Combined result', status: finalOutcome === 'inconclusive' ? 'none' : 'found', note: `${finalOutcome.toUpperCase()}: ${rule}` },
     {
       name: 'Page sample',
       status: meta.bodyChars ? (cms.length ? 'found' : 'none') : 'skipped',
@@ -376,12 +455,13 @@ export function analyze(input, hops, body = '', meta = {}) {
     redirects: hops.slice(0, -1).map((h) => ({ url: h.url, status: h.status })),
     httpStatus: final.status,
     findings,
+    crossCheck: { checks: [check1, check2], final: finalOutcome, rule },
     context: [...context],
     advisory: { cves: ADVISORY.cves.map((c) => c.id), fixed: ADVISORY.fixed },
   };
 }
 
-/** Version-only check (API: /api/version). */
+/** Version-only check (API: /api/version): the same two checks and rule, on the version string alone. */
 export function checkVersion(input) {
   const raw = String(input ?? '').trim().slice(0, 120);
   const token = extractPhpToken(raw) ?? raw;
@@ -389,7 +469,11 @@ export function checkVersion(input) {
   if (!v) throw new ScanError('bad_version', 'Enter a PHP version such as 8.3.30.');
   const assessment = assessVersion(v);
   const backport = detectBackport(token, null);
-  const verdict = verdictFor(assessment, backport);
+  const oaStatus = openaiPatchStatus(token.match(/^\d+\.\d+\.\d+[^\s,;)]*/)?.[0] ?? '');
+  const check1 = { ...CHECK1, outcome: outcomeOf(assessment.status), version: assessment.version, detail: assessment.summary };
+  const check2 = { ...CHECK2, outcome: outcomeOf(oaStatus), version: assessment.version, detail: `PHP ${assessment.version} is ${OA_WORDS[oaStatus]}.` };
+  const { final, rule } = combineChecks(check1, check2);
+  const verdict = final === 'positive' ? 'vulnerable' : final === 'negative' ? 'patched' : 'verify';
   const context = ['php', verdict];
   if (assessment.status === 'vulnerable_eol' || assessment.status === 'unlisted') context.push('eol');
   if (backport) context.push('distro');
@@ -398,7 +482,9 @@ export function checkVersion(input) {
     details: {
       checks: [
         { name: 'Input parsing', status: 'ok', note: `Read PHP version ${assessment.version} from "${raw}".` },
-        { name: `Check for ${ADVISORY.cves.map((c) => c.id).join(' and ')}`, status: 'ok', note: assessment.summary },
+        { name: check1.name, status: 'found', note: `${check1.outcome.toUpperCase()}: ${check1.detail}` },
+        { name: check2.name, status: 'found', note: `${check2.outcome.toUpperCase()}: ${check2.detail}` },
+        { name: 'Combined result', status: 'found', note: `${final.toUpperCase()}: ${rule}` },
         { name: 'Operating-system hint', status: os ? 'found' : 'none', note: os ? `${os.name}${os.release ? ` ${os.release}` : ''} (${os.confidence} confidence – ${os.basis}).` : 'The version string carries no distro information.' },
         { name: 'Network request', status: 'skipped', note: 'None – this check is done purely on the version string you entered.' },
       ],
@@ -409,9 +495,10 @@ export function checkVersion(input) {
     scannedAt: new Date().toISOString(),
     verdict,
     headline: { vulnerable: 'Vulnerable version', verify: 'Needs verification', patched: 'Patched version' }[verdict],
-    detail: assessment.summary + (backport ? ` This build comes from ${backport}; check its changelog for the backported fix.` : ''),
+    detail: assessment.summary + (backport && final === 'positive' ? ` This looks like a ${backport} build; also check its changelog for a backported fix.` : ''),
     php: { detected: true, version: assessment.version, fixedIn: assessment.fixedIn, status: assessment.status, sapi: 'unknown', distro: backport, cms: [], evidence: [] },
     findings: [],
+    crossCheck: { checks: [check1, check2], final, rule },
     context,
     advisory: { cves: ADVISORY.cves.map((c) => c.id), fixed: ADVISORY.fixed },
   };

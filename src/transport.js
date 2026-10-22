@@ -25,7 +25,7 @@ export function makeEdgeFetch({ maxBody = 64 * 1024 } = {}) {
   };
 }
 
-async function socketFetch(url, { headers = {}, signal } = {}, maxBody) {
+async function socketFetch(url, { method = 'GET', headers = {}, signal } = {}, maxBody) {
   const { connect } = await import('cloudflare:sockets');
   const u = new URL(url);
   const tls = u.protocol === 'https:';
@@ -36,7 +36,7 @@ async function socketFetch(url, { headers = {}, signal } = {}, maxBody) {
 
   try {
     await sock.opened;
-    const lines = [`GET ${u.pathname}${u.search} HTTP/1.1`, `Host: ${u.host}`, 'Connection: close', 'Accept-Encoding: identity'];
+    const lines = [`${method} ${u.pathname}${u.search} HTTP/1.1`, `Host: ${u.host}`, 'Connection: close', 'Accept-Encoding: identity'];
     for (const [k, v] of Object.entries(headers)) lines.push(`${k}: ${v}`);
     const writer = sock.writable.getWriter();
     await writer.write(new TextEncoder().encode(lines.join('\r\n') + '\r\n\r\n'));
@@ -76,7 +76,7 @@ async function socketFetch(url, { headers = {}, signal } = {}, maxBody) {
 
     // Body: only what the scanner may read (HTML, capped), never for redirects.
     let body = null;
-    const wantBody = !NULL_BODY.has(status) && !(status >= 300 && status < 400) && /html/i.test(h.get('content-type') || '');
+    const wantBody = method !== 'HEAD' && !NULL_BODY.has(status) && !(status >= 300 && status < 400) && /html/i.test(h.get('content-type') || '');
     if (wantBody) {
       const chunked = /chunked/i.test(h.get('transfer-encoding') || '');
       const length = Number(h.get('content-length'));

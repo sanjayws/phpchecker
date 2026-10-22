@@ -38,11 +38,12 @@ test('scan: version is read from the PHP token, not other products', async () =>
   assert.equal(res.verdict, 'vulnerable');
 });
 
-test('scan: Ubuntu build is "verify" and OS is fingerprinted', async () => {
+test('scan: Ubuntu build is positive but flagged for backport check; OS is fingerprinted', async () => {
   const res = await scan('https://example.com', {
     fetchImpl: mockFetch({ 'https://example.com/': html({ server: 'Apache/2.4.52 (Ubuntu)', 'x-powered-by': 'PHP/8.1.2-1ubuntu2.14' }) }),
   });
-  assert.equal(res.verdict, 'verify');
+  assert.equal(res.verdict, 'vulnerable');
+  assert.match(res.detail, /backport/);
   assert.equal(res.details.fingerprint.os.name, 'Ubuntu');
   assert.equal(res.details.fingerprint.os.release, '22.04');
 });
@@ -99,10 +100,62 @@ test('scan: HTTP errors and bot challenges are flagged', async () => {
   assert.ok(res.findings.some((f) => f.id === 'http-error' && /challenge/.test(f.detail)));
 });
 
+const outcomes = (res) => res.crossCheck.checks.map((c) => c.outcome).concat(res.crossCheck.final).join(',');
+const one = (headers) => scan('example.com', { fetchImpl: mockFetch({ 'https://example.com/': html(headers) }) });
+
+test('two-check rule: both positive / OpenAI positive / both negative / inconclusive', async () => {
+  assert.equal(outcomes(await one({ 'x-powered-by': 'PHP/8.3.30' })), 'positive,positive,positive');
+  assert.equal(outcomes(await one({ 'x-powered-by': 'PHP/8.5.12' })), 'negative,negative,negative');
+  assert.equal((await one({ 'x-powered-by': 'PHP/8.5.12' })).verdict, 'patched');
+  assert.equal(outcomes(await one({ server: 'nginx' })), 'inconclusive,inconclusive,inconclusive');
+  // Pre-release of a fixed patch: neither check is positive and they are not both negative -> inconclusive.
+  const dev = await one({ 'x-powered-by': 'PHP/8.5.12-dev' });
+  assert.equal(dev.crossCheck.final, 'inconclusive');
+  assert.equal(dev.verdict, 'verify');
+});
+
+test('two-check rule: a positive from either check is enough', async () => {
+  // Page says fixed (8.5.12) on GET, but the HEAD banner (what OpenAI's method reads) reports 7.4.33.
+  const fetchImpl = async (url, init) =>
+    new Response('<html></html>', { headers: { 'content-type': 'text/html', 'x-powered-by': init.method === 'HEAD' ? 'PHP/7.4.33' : 'PHP/8.5.12' } });
+  const res = await scan('example.com', { fetchImpl });
+  assert.deepEqual(res.crossCheck.checks.map((c) => c.outcome), ['negative', 'positive']);
+  assert.equal(res.crossCheck.final, 'positive');
+  assert.equal(res.verdict, 'vulnerable');
+  assert.match(res.crossCheck.rule, /OpenAI check is positive/);
+  // ...and the reverse: our check positive, OpenAI negative.
+  const rev = await scan('example.com', {
+    fetchImpl: async (url, init) => new Response('<html></html>', { headers: { 'content-type': 'text/html', 'x-powered-by': init.method === 'HEAD' ? 'PHP/8.5.12' : 'PHP/8.3.30' } }),
+  });
+  assert.equal(rev.crossCheck.final, 'positive');
+  assert.match(rev.crossCheck.rule, /plain version check is positive/);
+});
+
+test('two-check rule: one negative + one inconclusive needs verification', async () => {
+  const res = await scan('example.com', {
+    fetchImpl: async (url, init) => new Response('<html></html>', { headers: { 'content-type': 'text/html', ...(init.method === 'HEAD' ? {} : { 'x-powered-by': 'PHP/8.5.12' }) } }),
+  });
+  assert.deepEqual(res.crossCheck.checks.map((c) => c.outcome), ['negative', 'inconclusive']);
+  assert.equal(res.verdict, 'verify');
+});
+
+test('OpenAI check follows one redirect only when the first response was a bare redirect', async () => {
+  const res = await scan('example.com', {
+    fetchImpl: mockFetch({
+      'https://example.com/': { status: 301, headers: { location: 'https://www.example.com/' } },
+      'https://www.example.com/': html({ 'x-powered-by': 'PHP/8.3.30' }),
+    }),
+  });
+  assert.equal(res.crossCheck.checks[1].outcome, 'positive');
+  assert.match(res.details.checks.find((c) => c.name.startsWith('Check 2')).note, /repeated on the final URL/);
+});
+
 test('checkVersion', () => {
   assert.equal(checkVersion('8.4.27').verdict, 'patched');
   assert.equal(checkVersion('PHP/7.4.33').verdict, 'vulnerable');
-  assert.equal(checkVersion('8.1.2-1ubuntu2.14').verdict, 'verify');
+  assert.equal(checkVersion('8.1.2-1ubuntu2.14').verdict, 'vulnerable');
+  assert.equal(checkVersion('8.5.12-dev').verdict, 'verify');
+  assert.equal(checkVersion('8.5.12').crossCheck.final, 'negative');
   assert.throws(() => checkVersion('hello'), ScanError);
 });
 

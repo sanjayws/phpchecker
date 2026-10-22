@@ -19,25 +19,28 @@ Workers Logs for the account that deploys the Worker.
 
 ## How it works
 
-You enter a website URL. PHPChecker makes one ordinary `GET` request (following up to 3 redirects),
-reads the response headers and up to 64 KB of HTML, and:
+You enter a website URL. PHPChecker runs **two independent checks** and shows both, plus the rule that combines them:
 
-0. Connects over a **direct TLS/TCP socket** from the Worker, so the headers are exactly what the site sent.
-   (Cloudflare rewrites `Server`/`CF-RAY` on Worker `fetch()` responses. Workers can't open sockets to Cloudflare's
-   own IPs, so Cloudflare-hosted sites go through `fetch()`: their origin web server is hidden, and DNS confirms
-   whether they are on Cloudflare. `X-Powered-By` and cookies are unaffected either way.)
+| | Check | What it does |
+| --- | --- | --- |
+| 1 | **Plain version check** | One normal `GET` (up to 3 redirects, 64 KB of HTML). Reads the PHP version the page response discloses (`X-Powered-By`, or `Server` with ServerTokens Full) and compares it with the affected range and fixed releases above. |
+| 2 | **OpenAI's php2shell-checker method** | A `HEAD` request to the URL as entered (`GET` only if the server answers 405/501), redirects not followed, every `PHP/x.y.z` token in `Server` and `X-Powered-By` tested against OpenAI's version table, the worst banner kept. If the first response is only a redirect and shows no version, the same method is repeated once on the final URL (stated in the details). |
 
-1. Finds the PHP version the site discloses (`X-Powered-By`, or `Server` with ServerTokens Full).
-2. Compares it with the affected range and fixed releases above.
-3. Accounts for distro builds: Ubuntu/Debian/RHEL often backport fixes without changing the version,
-   so those results say **verify** (check the package changelog), not "vulnerable".
-4. Fingerprints the web server, likely SAPI (mod_php / PHP-FPM), OS hint, CDN and CMS. A **Details** button shows
-   everything found and every check performed or skipped.
-5. Ranks 47 help resources for the result: patching commands per platform, backport verification, php.ini
-   hardening, ModSecurity/nginx/Apache/Cloudflare workarounds, EOL options, detection rules, hunting,
-   incident response and a leadership brief.
+Each check returns **positive** (affected version), **negative** (fixed version) or **inconclusive**, and the result is:
 
-Verdicts: `vulnerable` · `verify` · `patched` · `unknown` (PHP found, version hidden – **not** proof of safety) · `no-php`.
+* **Positive** if *either* check is positive (both positive, or only one).
+* **Negative** only if *both* checks are negative.
+* **Inconclusive** otherwise (for example, the version is hidden, or it is a pre-release build).
+
+Distro builds (Ubuntu/Debian/RHEL…) can carry backported fixes, so a positive on those also says to check the
+package changelog. Pre-release builds (`8.5.12-dev`) and branches newer than the advisory table (8.6+) are never
+treated as fixed. A **Details** button shows the web server, likely SAPI, OS hint, CDN and CMS fingerprint and every
+request made. The page also ranks 47 help resources for the result: patching commands per platform, backport
+verification, php.ini hardening, ModSecurity/nginx/Apache/Cloudflare workarounds, EOL options, detection rules,
+hunting, incident response and a leadership brief.
+
+Results: `vulnerable` · `patched` · `verify` (one check found a fixed version the other couldn't confirm, or a pre-release) ·
+`unknown` (PHP found, version hidden – **not** proof of safety) · `no-php`.
 
 ### What it does not do
 
@@ -57,6 +60,11 @@ route to local servers) and checks results against an expectation table written 
   using `PHP_VERSION` as ground truth.
 * The passive-scan promises: every request the scanner sends is recorded and must be a body-less `GET`;
   HTML reads stop at 64 KB; unresponsive sites time out; redirects into private addresses are never followed.
+
+Unit tests also check our verdicts against OpenAI php2shell-checker's version table on every listed
+branch (400+ versions); the two agree.
+
+The harness also checks every real interpreter with both checks, and cases where the two checks disagree.
 
 CI runs the same validation against real PHP 7.4, 8.1, 8.3 and 8.5 (`.github/workflows/ci.yml`).
 The production transport (direct sockets + Cloudflare fallback) was additionally checked on Cloudflare's edge
@@ -123,6 +131,12 @@ test/               unit tests (node --test)
 validation/         end-to-end validation harness
 docs/PLAN.md        design notes
 ```
+
+## Acknowledgements
+
+- [OpenAI php2shell-checker](https://github.com/openai/php2shell-checker) (Apache-2.0) – fallback detection
+  method, pre-release rule and version table used as a test oracle. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+- [ikow/php2shell-poc](https://github.com/ikow/php2shell-poc) – original research, advisory data and detection rules.
 
 ## License
 

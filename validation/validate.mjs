@@ -25,7 +25,6 @@ const DOMAIN = 'phpchecker-validation.com';
 const FIXED = { '8.2': 35, '8.3': 36, '8.4': 27, '8.5': 12 };
 function oracle(version) {
   // Distro packages (not Surý/Remi upstream repackages) may carry backports the number can't show.
-  if (/ubuntu|deb\d|\.el\d/i.test(version) && !/sury|remi/i.test(version)) return 'verify';
   const [ma, mi, pa] = version.split(/[^0-9]+/).map(Number);
   if (ma < 5 || (ma === 5 && mi < 4)) return 'verify';
   if (ma > 8 || (ma === 8 && mi > 5)) return 'patched';
@@ -90,7 +89,11 @@ async function profileServer(p) {
     routes.set(host, s.address().port);
     servers.push(s);
   } else {
-    const s = await listen((req, res) => send(res, p.status ?? 200, p.headers, p.body));
+    const s = await listen((req, res) =>
+      req.method === 'HEAD' && p.headHeaders
+        ? send(res, p.headStatus ?? p.status ?? 200, p.headHeaders, '')
+        : send(res, p.status ?? 200, p.headers, p.body),
+    );
     s.label = host;
     routes.set(host, s.address().port);
     servers.push(s);
@@ -119,6 +122,15 @@ function compare(res, expect) {
   if ('webserver' in expect && (res.details.fingerprint.webserver?.raw ?? null) !== expect.webserver) p.push(`webserver ${res.details.fingerprint.webserver?.raw} != ${expect.webserver}`);
   for (const c of expect.context || []) if (!res.context.includes(c)) p.push(`context missing ${c}`);
   if (expect.finding && !res.findings.some((f) => f.id === expect.finding)) p.push(`finding ${expect.finding} missing`);
+  if (expect.checks) {
+    const got = res.crossCheck.checks.map((c) => c.outcome);
+    if (got.join() !== expect.checks.join()) p.push(`checks ${got} != ${expect.checks}`);
+  }
+  if (expect.final && res.crossCheck.final !== expect.final) p.push(`final ${res.crossCheck.final} != ${expect.final}`);
+  if (expect.fallbackRequests) {
+    const got = res.details.checks.find((c) => c.name.startsWith('Check 2'))?.note || '';
+    for (const r of expect.fallbackRequests) if (!got.includes(r)) p.push(`fallback missing "${r}"`);
+  }
   if ('redirects' in expect && res.redirects.length !== expect.redirects) p.push(`redirects ${res.redirects.length} != ${expect.redirects}`);
   if (!res.details.checks.some((c) => c.name.includes('CVE-2026-109618') && c.name.includes('CVE-2026-109619'))) p.push('CVE check step missing');
   p.got = `${res.verdict}${res.php.version ? ` (PHP ${res.php.version})` : ''}`;
@@ -218,6 +230,10 @@ try {
           const res = await scan(`${label}.${DOMAIN}`, opts);
           const p = compare(res, expected);
           if (!res.php.evidence.some((e) => e.includes('PHPSESSID'))) p.push('PHPSESSID evidence missing');
+          if (!hidden) {
+            const want = { vulnerable: 'positive', patched: 'negative' }[expected.verdict] ?? 'inconclusive';
+            for (const c of res.crossCheck.checks) if (c.outcome !== want) p.push(`${c.id} check ${c.outcome} != ${want}`);
+          }
           p.got += ` – expected ${expected.verdict}`;
           return p;
         });
@@ -226,9 +242,9 @@ try {
   }
 
   // 5) Passive-scan promises, over every request any server received
-  await check('passive-only', 'Scanner only sent body-less GETs with its own User-Agent', async () => {
+  await check('passive-only', 'Scanner only sent body-less GET/HEAD requests with its own User-Agent', async () => {
     const scannerReqs = requestLog.filter((r) => /PHPChecker\//.test(r.ua || ''));
-    const bad = scannerReqs.filter((r) => r.method !== 'GET' || r.bodyBytes > 0 || (r.contentLength && r.contentLength !== '0'));
+    const bad = scannerReqs.filter((r) => !['GET', 'HEAD'].includes(r.method) || r.bodyBytes > 0 || (r.contentLength && r.contentLength !== '0'));
     const p = bad.map((r) => `${r.method} with ${r.bodyBytes} body bytes to ${r.host}`);
     if (!scannerReqs.length) p.push('no scanner requests recorded');
     return p;

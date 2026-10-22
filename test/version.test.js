@@ -16,10 +16,42 @@ test('EOL branches are vulnerable without a fix', () => {
   for (const v of ['5.4.0', '7.4.33', '8.0.30', '8.1.2']) assert.equal(assess(v).status, 'vulnerable_eol', v);
 });
 
-test('older than affected range and newer than 8.5', () => {
+test('older than affected range and newer than 8.5 are not assumed fixed', () => {
   assert.equal(assess('5.3.29').status, 'unlisted');
-  assert.equal(assess('8.6.0').status, 'patched');
-  assert.equal(assess('9.0.1').status, 'patched');
+  assert.equal(assess('8.6.0').status, 'unlisted');
+  assert.equal(assess('9.0.1').status, 'unlisted');
+  assert.equal(verdictFor(assess('8.6.0'), null), 'verify');
+});
+
+test('pre-release builds of a fixed patch are not treated as fixed', () => {
+  for (const v of ['8.5.12-dev', '8.4.27RC1', '8.3.36-beta2', '8.2.35alpha1']) {
+    assert.equal(assess(v).status, 'prerelease', v);
+    assert.equal(verdictFor(assess(v), null), 'verify', v);
+  }
+  assert.equal(assess('8.3.36-1ubuntu1').status, 'patched'); // distro revision, not a pre-release
+});
+
+// Parity with OpenAI's php2shell-checker (https://github.com/openai/php2shell-checker,
+// Apache-2.0): its "vulnerable through" table, transcribed as an independent oracle.
+const OPENAI_VULNERABLE_THROUGH = {
+  '5.4': 45, '5.5': 38, '5.6': 40,
+  '7.0': 33, '7.1': 33, '7.2': 34, '7.3': 33, '7.4': 33,
+  '8.0': 30, '8.1': 34, '8.2': 34, '8.3': 35, '8.4': 26, '8.5': 11,
+};
+test('agrees with OpenAI php2shell-checker cutoffs on every listed branch', () => {
+  let n = 0;
+  for (const [branch, last] of Object.entries(OPENAI_VULNERABLE_THROUGH)) {
+    for (let patch = 0; patch <= last + 5; patch++) {
+      const v = `${branch}.${patch}`;
+      const theirs = patch <= last ? 'vulnerable' : 'ok';
+      const ours = verdictFor(assess(v), null);
+      if (theirs === 'vulnerable') assert.equal(ours, 'vulnerable', v);
+      // Above OpenAI's cutoff on an EOL branch no stable release exists; ours stays vulnerable (no upstream fix).
+      else if (Number(branch) >= 8.2) assert.equal(ours, 'patched', v);
+      n++;
+    }
+  }
+  assert.ok(n > 400);
 });
 
 test('branch-only versions need verification', () => {

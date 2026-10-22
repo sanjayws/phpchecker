@@ -48,9 +48,13 @@ export function parseVersion(input) {
   };
 }
 
+// Development builds of a fixed-looking patch are not evidence of a stable fix
+// (rule adopted from OpenAI's php2shell-checker, Apache-2.0).
+const PRERELEASE = /^\d+\.\d+\.\d+[-+~.]?(?:dev|alpha|beta|rc)/i;
+
 /**
  * Compare a parsed version with the advisory.
- * status: vulnerable | vulnerable_eol | patched | unlisted | incomplete
+ * status: vulnerable | vulnerable_eol | patched | prerelease | unlisted | incomplete
  */
 export function assessVersion(v) {
   const label = v.patch === null ? `${v.major}.${v.minor}` : `${v.major}.${v.minor}.${v.patch}`;
@@ -61,7 +65,12 @@ export function assessVersion(v) {
   const base = { version: label, branch, fixedIn: null };
 
   if (v.major > 8 || (v.major === 8 && v.minor > 5)) {
-    return { ...base, status: 'patched', summary: `PHP ${label} is newer than the affected range.` };
+    // Not in the advisory's table: don't assume a fix (same stance as OpenAI's checker).
+    return {
+      ...base,
+      status: 'unlisted',
+      summary: `PHP ${branch} is newer than the branches covered by the advisory, so its status can't be confirmed from the version alone. Check the release notes for ${ADVISORY.cves.map((c) => c.id).join(' and ')}.`,
+    };
   }
   if (v.major < a.major || (v.major === a.major && v.minor < a.minor)) {
     return {
@@ -89,6 +98,14 @@ export function assessVersion(v) {
     };
   }
   if (v.patch >= fixedPatch) {
+    if (PRERELEASE.test(v.raw.replace(/^.*?(?=\d+\.\d+\.\d+)/, ''))) {
+      return {
+        ...base,
+        fixedIn,
+        status: 'prerelease',
+        summary: `PHP ${v.raw} is a development/pre-release build. Only stable releases from ${fixedIn} are known to include the fix.`,
+      };
+    }
     return { ...base, fixedIn, status: 'patched', summary: `PHP ${label} includes the fix (first fixed: ${fixedIn}).` };
   }
   return {
@@ -107,6 +124,7 @@ export function verdictFor(assessment, distro) {
       return distro ? 'verify' : 'vulnerable';
     case 'incomplete':
     case 'unlisted':
+    case 'prerelease':
       return 'verify';
     case 'patched':
       return 'patched';

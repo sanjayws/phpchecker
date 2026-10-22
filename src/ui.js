@@ -108,6 +108,20 @@ body[data-mode=results] .title{font-size:clamp(18px,3vw,28px);margin-bottom:18px
 .dbtn .ic{transition:transform .15s}
 .dbtn[aria-expanded=true] .ic{transform:rotate(180deg)}
 .vbody{padding:18px 24px 18px}
+.xcheck{margin-top:14px;border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden}
+.xh{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--soft);font-size:13px}
+.xh span{color:var(--muted)}
+.crow{display:flex;gap:12px;padding:14px;border-bottom:1px solid var(--line)}
+.cnum{flex:none;width:24px;height:24px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-weight:800;font-size:12px;display:grid;place-items:center;margin-top:1px}
+.cbody{flex:1;min-width:0}.cname{font-weight:700}.chow{font-size:12px;color:var(--muted);margin-bottom:4px}.cdet{font-size:14px;color:var(--ink2)}
+.cres{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:4px;text-align:right}
+.oc{font-size:12px;font-weight:700;border-radius:999px;padding:2px 10px;border:1px solid;white-space:nowrap}
+.oc.positive{color:#b91c1c;background:#fef2f2;border-color:#fecaca}.oc.negative{color:#15803d;background:#f0fdf4;border-color:#bbf7d0}.oc.inconclusive{color:#475569;background:#f1f5f9;border-color:#e2e8f0}
+.xfoot{padding:12px 14px;display:grid;gap:8px;font-size:13px}
+.xlab{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-right:8px}
+.xfinal{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}.xwhy{color:var(--ink2)}
+.xcheck.positive .xfoot{background:#fef2f2}.xcheck.negative .xfoot{background:#f0fdf4}.xcheck.inconclusive .xfoot{background:var(--soft)}
+@media (max-width:600px){.crow{flex-wrap:wrap}.cres{flex-direction:row;align-items:center;margin-left:36px}}
 .vrow{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px}
 .target{flex:1;min-width:0;font-size:13px;color:var(--muted);margin:5px 0 0;word-break:break-all}
 .target b{color:var(--ink2)}
@@ -204,7 +218,7 @@ footer b{color:var(--ink2);font-weight:600}
       <button class="btn" id="go" type="submit">Scan<span class="t"> website</span> <span class="ic">__I_ARROW__</span></button>
     </div>
     <p class="consent"><b>By scanning you confirm you own this site or are authorised to test it.</b><br><b>Passive check only &ndash; nothing is exploited.</b></p>
-    <div class="trust"><span><i class="ic">__I_CHECK__</i>One normal request</span><span><i class="ic">__I_CHECK__</i>Nothing exploited</span><span><i class="ic">__I_CHECK__</i>No cookies or tracking</span></div>
+    <div class="trust"><span><i class="ic">__I_CHECK__</i>Normal requests only</span><span><i class="ic">__I_CHECK__</i>Nothing exploited</span><span><i class="ic">__I_CHECK__</i>No cookies or tracking</span></div>
   </form>
 </section>
 <main id="main">
@@ -212,7 +226,7 @@ footer b{color:var(--ink2);font-weight:600}
   __HOME__
 </main>
 <footer><div class="wrap">
-  <span><b>Open source</b> (MIT) &middot; <a href="__REPO__" target="_blank" rel="noopener noreferrer">source on GitHub</a></span>
+  <span><b>Open source</b> (MIT) &middot; <a href="__REPO__" target="_blank" rel="noopener noreferrer">source on GitHub</a> &middot; fallback method from <a href="https://github.com/openai/php2shell-checker" target="_blank" rel="noopener noreferrer">OpenAI php2shell-checker</a> (Apache-2.0)</span>
   <span>No cookies, analytics or tracking. Only scan requests are logged, for safety and audit-trail purposes.</span>
 </div></footer>
 <script nonce="__NONCE__">
@@ -267,6 +281,22 @@ function fact(dl,k,v){if(v==null||v==='')return;dl.appendChild(h('dt',{text:k}))
 var PILL={vulnerable:'Action needed',verify:'Check required',patched:'Safe version','no-php':'Not detected',unknown:'Inconclusive'};
 var VICON={vulnerable:'shieldAlert',verify:'shieldQ',patched:'shieldCheck','no-php':'shieldQ',unknown:'shieldQ'};
 
+var OUT={positive:'Positive',negative:'Negative',inconclusive:'Inconclusive'};
+function checkRow(c,n){
+  return h('div',{class:'crow'},
+    h('span',{class:'cnum',text:String(n)}),
+    h('div',{class:'cbody'},h('div',{class:'cname',text:c.name.replace(/^Check \d · /,'')}),h('div',{class:'chow',text:c.how||''}),h('div',{class:'cdet',text:c.detail})),
+    h('div',{class:'cres'},h('span',{class:'oc '+c.outcome,text:OUT[c.outcome]}),c.version?h('b',{text:'PHP '+c.version}):null));
+}
+function crossCheck(r){
+  var c=r.crossCheck;if(!c)return null;
+  return h('div',{class:'xcheck '+c.final},
+    h('div',{class:'xh'},h('b',{text:'How this result was reached'}),h('span',{text:'two independent checks, combined by a fixed rule'})),
+    checkRow(c.checks[0],1),checkRow(c.checks[1],2),
+    h('div',{class:'xfoot'},h('div',{class:'xrule'},h('span',{class:'xlab',text:'Rule'}),h('span',{text:'Positive if either check is positive. Negative only if both are negative. Otherwise inconclusive.'})),
+      h('div',{class:'xfinal'},h('span',{class:'xlab',text:'Result'}),h('span',{class:'oc '+c.final,text:OUT[c.final]}),h('span',{class:'xwhy',text:c.rule}))));
+}
+
 function verdictCard(r){
   var fp=(r.details&&r.details.fingerprint)||{},ws=fp.webserver,os=fp.os;
   var card=h('section',{class:'vcard '+r.verdict});
@@ -289,6 +319,7 @@ function verdictCard(r){
   tile(tiles,'Application',r.php.cms&&r.php.cms.length?r.php.cms.join(', '):null);
   tile(tiles,'PHP SAPI',r.php.sapi&&r.php.sapi!=='unknown'?r.php.sapi:null);
   if(tiles.firstChild)body.appendChild(tiles);
+  var xc=crossCheck(r);if(xc)body.appendChild(xc);
   var checked=h('div',{class:'checked'},h('span',{text:'Checked for'}));
   (r.advisory.cves||[]).forEach(function(c){checked.appendChild(h('span',{class:'chip',text:c}));});
   body.appendChild(checked);
@@ -431,8 +462,8 @@ const HOME_HTML =
   '</div>' +
   `<div class="range"><div><span class="k">Affected</span><b>PHP 5.4.0 &ndash; ${esc(ADVISORY.lastAffected)}</b></div><div><span class="k">Fixed in</span>${fixedChips}</div></div>` +
   '<div class="steps">' +
-  '<div class="step"><span class="n">1</span><div><b>Fetch</b><span>One normal request to your site, never an exploit.</span></div></div>' +
-  '<div class="step"><span class="n">2</span><div><b>Fingerprint</b><span>PHP version, web server, OS hint, CDN and CMS.</span></div></div>' +
+  '<div class="step"><span class="n">1</span><div><b>Fetch</b><span>A normal page request to your site &ndash; never an exploit.</span></div></div>' +
+  '<div class="step"><span class="n">2</span><div><b>Fingerprint</b><span>PHP version, web server, OS hint, CDN and CMS. If the version is hidden, a HEAD check using OpenAI&rsquo;s method.</span></div></div>' +
   '<div class="step"><span class="n">3</span><div><b>Compare</b><span>Against the advisory&rsquo;s affected range and fixed releases. A hidden version is reported as unknown, not safe.</span></div></div>' +
   '</div></section>';
 
